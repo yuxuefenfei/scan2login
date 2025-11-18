@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>扫码登录 - PC端</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .qr-code {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #eee;
+        }
+
+        #qrcode {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ddd;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .status.init {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .status.scanned {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.confirmed {
+            background: #d1edff;
+            color: #004085;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .user-info {
+            display: none;
+            margin: 15px 0;
+        }
+
+        .countdown {
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+    <script src="/js/qrcode.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h2>扫码登录</h2>
+    <p>请使用手机App扫描下方二维码</p>
+
+    <div class="qr-code">
+        <div id="qrcode">生成二维码中...</div>
+        <div class="countdown">二维码有效期：<span id="countdown">120</span>秒</div>
+    </div>
+
+    <div class="status init" id="statusMessage">
+        等待扫描...
+    </div>
+
+    <div class="user-info" id="userInfo">
+        <img alt="头像" id="userAvatar" src="" style="width: 50px; height: 50px; border-radius: 50%;">
+        <div id="userName"></div>
+        <button onclick="confirmLogin()"
+                style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px;">
+            确认登录
+        </button>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <button onclick="refreshQrCode()" style="padding: 8px 16px; margin-right: 10px;">
+            刷新二维码
+        </button>
+        <button onclick="location.href='/'" style="padding: 8px 16px;">
+            返回首页
+        </button>
+    </div>
+</div>
+
+<script>
+    let currentQrId = null;
+    let countdownInterval = null;
+
+    // 生成二维码
+    async function generateQrCode() {
+        try {
+            const response = await fetch('/api/qrcode/generate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+
+            currentQrId = data.qrId;
+            const qrContent = window.location.origin + data.qrContent;
+
+            // 生成二维码图片
+            document.getElementById('qrcode').innerHTML = '';
+            new QRCode(document.getElementById('qrcode'), {
+                text: qrContent,
+                width: 200,
+                height: 200
+            });
+
+            startCountdown(120);
+            startPolling();
+
+            console.log("二维码生成成功，QR内容:", qrContent);
+        } catch (error) {
+            console.error('生成二维码失败:', error);
+        }
+    }
+
+    // 开始倒计时
+    function startCountdown(seconds) {
+        let timeLeft = seconds;
+        const countdownElement = document.getElementById('countdown');
+
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+
+        countdownInterval = setInterval(() => {
+            timeLeft--;
+            countdownElement.textContent = timeLeft;
+
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                updateStatus('二维码已过期', 'expired');
+            }
+        }, 1000);
+    }
+
+    // 轮询检查状态
+    function startPolling() {
+        const pollInterval = setInterval(async () => {
+            if (!currentQrId) {
+                clearInterval(pollInterval);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/qrcode/status/${currentQrId}`);
+                const data = await response.json();
+                debugger;
+                handleStatusUpdate(data);
+
+                // 如果已确认或过期，停止轮询
+                if (data.status === 'CONFIRMED' || data.status === 'EXPIRED') {
+                    clearInterval(pollInterval);
+                    if (data.status === 'CONFIRMED' && data.pcToken) {
+                        // 登录成功，跳转
+                        window.location.href = `/success?token=${data.pcToken}`;
+                    }
+                }
+            } catch (error) {
+                console.error('轮询失败:', error);
+            }
+        }, 2000);
+    }
+
+    // 处理状态更新
+    function handleStatusUpdate(data) {
+        const userInfo = document.getElementById('userInfo');
+
+        switch (data.status) {
+            case 'INIT':
+                updateStatus('等待扫描...', 'init');
+                userInfo.style.display = 'none';
+                break;
+            case 'SCANNED':
+                updateStatus('二维码已扫描，请在手机上确认', 'scanned');
+                if (data.user) {
+                    debugger;
+                    document.getElementById('userAvatar').src = data.user.avatar;
+                    document.getElementById('userName').textContent = data.user.username;
+                    userInfo.style.display = 'block';
+                }
+                break;
+            case 'CONFIRMED':
+                updateStatus('登录确认中...', 'confirmed');
+                break;
+            case 'EXPIRED':
+                updateStatus('二维码已过期，请刷新', 'expired');
+                userInfo.style.display = 'none';
+                break;
+        }
+    }
+
+    function updateStatus(message, className) {
+        const statusElement = document.getElementById('statusMessage');
+        statusElement.textContent = message;
+        statusElement.className = `status ${className}`;
+    }
+
+    function refreshQrCode() {
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+        generateQrCode();
+    }
+
+    function confirmLogin() {
+        // 这个功能通常只在手机端实现
+        alert('请在手机端确认登录');
+    }
+
+    // 页面加载时生成二维码
+    window.onload = generateQrCode;
+</script>
+</body>
+</html>

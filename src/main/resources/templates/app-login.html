@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>手机App登录</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+
+        .user-card:hover {
+            background: #f8f9fa;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .scan-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background: #007bff;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>选择用户登录</h2>
+    <p>选择测试用户进行登录（模拟手机App）</p>
+
+    <div class="user-card" onclick="loginAsUser('zhangsan')">
+        <div class="user-avatar">张</div>
+        <div class="user-info">
+            <strong>张三</strong>
+            <div style="color: #666; font-size: 14px;">13800138000</div>
+        </div>
+    </div>
+
+    <div class="user-card" onclick="loginAsUser('lisi')">
+        <div class="user-avatar">李</div>
+        <div class="user-info">
+            <strong>李四</strong>
+            <div style="color: #666; font-size: 14px;">13900139000</div>
+        </div>
+    </div>
+
+    <div id="loginStatus" style="margin: 15px 0; padding: 10px;  border-radius: 5px; display: none;"></div>
+
+    <a class="scan-btn" href="/app/scan" id="scanBtn" style="display: none;">
+        开始扫描二维码
+    </a>
+</div>
+
+<script>
+    let currentAppToken = null;
+
+    async function loginAsUser(username) {
+        try {
+            const response = await fetch('/api/auth/app-login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: username, password: 'test'})
+            });
+
+            const data = await response.json();
+
+            if (data.appToken) {
+                currentAppToken = data.appToken;
+                document.getElementById('loginStatus').innerHTML =
+                    `<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px;">
+                           登录成功！欢迎 ${data.user}
+                         </div>`;
+                document.getElementById('loginStatus').style.display = 'block';
+                document.getElementById('scanBtn').style.display = 'block';
+
+                // 存储Token到本地存储
+                localStorage.setItem('appToken', currentAppToken);
+                localStorage.setItem('currentUser', data.user);
+            }
+        } catch (error) {
+            console.error('登录失败:', error);
+            document.getElementById('loginStatus').innerHTML =
+                '<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px;">登录失败</div>';
+            document.getElementById('loginStatus').style.display = 'block';
+        }
+    }
+
+    // 检查是否已登录
+    window.onload = function () {
+        const savedToken = localStorage.getItem('appToken');
+        const savedUser = localStorage.getItem('currentUser');
+
+        if (savedToken && savedUser) {
+            currentAppToken = savedToken;
+            document.getElementById('loginStatus').innerHTML =
+                `<div style="background: #d1edff; color: #004085; padding: 10px; border-radius: 5px;">
+                       已登录: ${savedUser}
+                     </div>`;
+            document.getElementById('loginStatus').style.display = 'block';
+            document.getElementById('scanBtn').style.display = 'block';
+        }
+    };
+</script>
+</body>
+</html>

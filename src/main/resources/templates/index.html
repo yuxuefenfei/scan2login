@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>扫码登录演示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 50px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            margin: 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>欢迎使用扫码登录系统</h1>
+    <p>选择您的操作：</p>
+
+    <div>
+        <a class="btn" href="/qr-scan">PC端扫码登录</a>
+        <a class="btn" href="/app/login">手机App模拟</a>
+    </div>
+
+    <div style="margin-top: 50px;">
+        <h3>系统说明</h3>
+        <p>1. 点击"PC端扫码登录"在电脑上显示二维码</p>
+        <p>2. 点击"手机App模拟"在手机上扫描二维码</p>
+        <p>3. 在手机上确认登录后，电脑端自动登录成功</p>
+    </div>
+</div>
+</body>
+</html>

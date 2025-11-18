@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>扫描二维码</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.info {
+            background: #d1edff;
+            color: #004085;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>扫描二维码</h2>
+
+    <div class="input-group">
+        <label for="qrUrl">二维码内容（URL）:</label>
+        <input id="qrUrl" placeholder="请输入或粘贴二维码内容" type="text">
+    </div>
+
+    <button onclick="parseQrCode()">解析二维码</button>
+
+    <div id="qrInfo" style="display: none; margin: 20px 0; padding: 15px;
+             background: #f8f9fa; border-radius: 5px;">
+        <h4>扫描结果</h4>
+        <div>二维码ID: <span id="parsedQrId"></span></div>
+        <button id="scanBtn" onclick="scanQrCode()">扫描二维码</button>
+    </div>
+
+    <div id="confirmSection" style="display: none; margin: 20px 0;
+             padding: 15px; background: #fff3cd; border-radius: 5px;">
+        <h4>确认登录</h4>
+        <p>是否允许在PC端登录？</p>
+        <button onclick="confirmLogin()" style="background: #28a745;">确认登录</button>
+        <button onclick="cancelLogin()" style="background: #dc3545;">取消</button>
+    </div>
+
+    <div class="status" id="statusMessage"></div>
+
+    <div style="margin-top: 20px;">
+        <button onclick="location.href='/app/login'">返回登录</button>
+        <button onclick="location.href='/'">返回首页</button>
+    </div>
+</div>
+
+<script>
+    let currentQrId = null;
+    let currentAppToken = localStorage.getItem('appToken');
+
+    function parseQrCode() {
+        const qrUrl = document.getElementById('qrUrl').value;
+        if (!qrUrl) {
+            showStatus('请输入二维码内容', 'error');
+            return;
+        }
+
+        // 从URL中提取qrId参数
+        const urlParams = new URLSearchParams(new URL(qrUrl).search);
+        currentQrId = urlParams.get('qrId');
+
+        if (!currentQrId) {
+            showStatus('无效的二维码内容', 'error');
+            return;
+        }
+
+        document.getElementById('parsedQrId').textContent = currentQrId;
+        document.getElementById('qrInfo').style.display = 'block';
+        showStatus('二维码解析成功', 'success');
+    }
+
+    async function scanQrCode() {
+        if (!currentAppToken) {
+            showStatus('请先登录', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentAppToken}`
+                },
+                body: JSON.stringify({qrId: currentQrId})
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('confirmSection').style.display = 'block';
+                document.getElementById('scanBtn').disabled = true;
+                showStatus(`已扫描，用户: ${data.user.username}`, 'success');
+            } else {
+                showStatus('扫描失败: ' + (data.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('扫描失败:', error);
+            showStatus('扫描失败: ' + error.message, 'error');
+        }
+    }
+
+    async function confirmLogin() {
+        try {
+            const response = await fetch('/api/auth/confirm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentAppToken}`
+                },
+                body: JSON.stringify({qrId: currentQrId})
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showStatus('登录确认成功！PC端将自动登录', 'success');
+                document.getElementById('confirmSection').style.display = 'none';
+            } else {
+                showStatus('确认失败: ' + (data.message || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('确认失败:', error);
+            showStatus('确认失败: ' + error.message, 'error');
+        }
+    }
+
+    function cancelLogin() {
+        document.getElementById('confirmSection').style.display = 'none';
+        document.getElementById('scanBtn').disabled = false;
+        showStatus('已取消登录', 'info');
+    }
+
+    function showStatus(message, type) {
+        const statusElement = document.getElementById('statusMessage');
+        statusElement.textContent = message;
+        statusElement.className = `status ${type}`;
+        statusElement.style.display = 'block';
+    }
+
+    // 页面加载时检查登录状态
+    window.onload = function () {
+        if (!currentAppToken) {
+            showStatus('请先登录手机App', 'error');
+        }
+    };
+</script>
+</body>
+</html>
